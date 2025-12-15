@@ -1,4 +1,4 @@
-# CHAOS SYSTEM (Vani)
+﻿# VOICE OF CAMPUS
 
 **"Order is for the weak. Embrace the Chaos."**
 
@@ -6,26 +6,27 @@ A Brutalist, high-energy College Community & Governance System designed to disru
 
 ## 🚧 Features
 
-- **🔥 Brutalist UI:** A raw, chaotic, and high-contrast design system (Black, White, Red).
-- **🤖 Princi Kuttan AI:** An AI-powered, strict, and savage college principal chatbot (powered by Google Gemini).
+- **🔥 Brutalist UI:** A raw, chaotic, and high-contrast design system (Yellow, Cyan, Magenta, Black).
+- **🖤 EMO BOY AI:** An AI-powered, emotionally supportive (and slightly dramatic) campus companion.
+- **🏆 Leaderboard:** Top 10 students with a "Podium" style showcase for the top 3.
 - **🗳️ Campus Elections:** Real-time voting system for student council.
-- **📢 Anonymous Feedback:** Speak your truth without fear.
+- **📢 The Wall:** Anonymous feedback, rants, and suggestions.
 - **🚨 SOS Alert:** Instant emergency trigger for campus safety.
-- **📰 Campus Blogs:** Unfiltered news and updates.
+- **👨‍🏫 Professor Mode:** Admin capabilities to manage elections.
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** Vanilla HTML, CSS (Brutalist Design), JavaScript
 - **Backend:** Node.js, Express.js
-- **AI:** Google Gemini API (`@google/generative-ai`)
+- **AI:** OpenRouter API (Gemini 2.0 Flash)
 - **Data:** In-memory mock database
 
 ## 🚀 Setup & Run
 
-1.  **Clone the Chaos:**
+1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/The-Peacemaker/CHAOS-SYSTEM.git
-    cd CHAOS-SYSTEM
+    git clone <your-repo-url>
+    cd HACKATHON
     ```
 
 2.  **Install Dependencies:**
@@ -33,22 +34,12 @@ A Brutalist, high-energy College Community & Governance System designed to disru
     npm install
     ```
 
-3.  **Configure AI (Optional but Recommended):**
-    - Create a `.env` file in the root.
-    - Add your Google Gemini API Key:
-      ```env
-      GEMINI_API_KEY=your_actual_api_key_here
-      ```
-
-4.  **Unleash the System:**
+3.  **Start the Server:**
     ```bash
-    npm start
+    node server.js
     ```
-    Visit `http://localhost:3000` to witness the chaos.
+    Visit `http://localhost:3000` to enter the system.
 
 ## ⚠️ Disclaimer
 
-This system is designed for **HACKATHONS**. It uses an in-memory database, so data resets when the server restarts. Do not use for actual governance without a real database.
-
----
-*Built with rage and caffeine.*
+This is a hackathon project. Data is stored in memory and will reset when the server restarts.
