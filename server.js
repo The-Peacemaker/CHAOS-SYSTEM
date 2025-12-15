@@ -441,7 +441,7 @@ app.post('/api/chat', async (req, res) => {
                 "X-Title": "Voice of Campus"
             },
             body: JSON.stringify({
-                "model": "google/gemini-2.0-flash-exp:free",
+                "model": "meta-llama/llama-3.2-3b-instruct:free",
                 "messages": [
                     {
                         "role": "system",
