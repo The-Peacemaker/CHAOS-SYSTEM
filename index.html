@@ -1,0 +1,440 @@
+<!-- File: index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VANI // CHAOS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="logo">
+            VANI // CHAOS
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item active" onclick="switchTab('dashboard')">
+                HUB
+            </li>
+            <li class="nav-item" onclick="switchTab('feedback')">
+                VENT / RANT
+            </li>
+            <li class="nav-item" onclick="switchTab('blogs')">
+                HOT TAKES
+            </li>
+            <li class="nav-item" onclick="switchTab('elections')">
+                POWER STRUGGLE
+            </li>
+            <li class="nav-item" onclick="switchTab('chat')">
+                PRINCI KUTTAN
+            </li>
+            <li class="nav-item" onclick="switchTab('sos')" style="color: var(--red); font-weight: 900;">
+                PANIC BUTTON
+            </li>
+        </ul>
+        
+        <div class="user-profile">
+            <div style="font-size: 0.8rem; margin-bottom: 5px;">IDENTITY:</div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <strong id="user-name-display" style="background: black; color: white; padding: 2px 5px;">Alice Student</strong>
+                <span class="role-badge" id="user-role-display">Student</span>
+            </div>
+            <select id="userRole" onchange="handleRoleChange()" style="margin-top: 15px;">
+                <option value="Student">VIEW: STUDENT</option>
+                <option value="Professor">VIEW: PROFESSOR</option>
+            </select>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Header -->
+        <div class="header-bar">
+            <h2 id="page-title">HUB</h2>
+            <button class="secondary" onclick="refreshAll()">
+                REFRESH
+            </button>
+        </div>
+
+        <!-- DASHBOARD TAB -->
+        <div id="tab-dashboard" class="tab-content">
+            <div class="card">
+                <h3>WELCOME TO THE CHAOS</h3>
+                <p>GOVERNANCE IS BROKEN. FIX IT HERE.</p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+                <div class="card">
+                    <h4>POWER STRUGGLE</h4>
+                    <p class="text-muted">VOTE OR DON'T.</p>
+                    <button onclick="switchTab('elections')">GO VOTE</button>
+                </div>
+                <div class="card">
+                    <h4>HOT TAKES</h4>
+                    <p class="text-muted">READ THE NOISE.</p>
+                    <button onclick="switchTab('blogs')">READ BLOGS</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FEEDBACK TAB -->
+        <div id="tab-feedback" class="tab-content hidden">
+            <!-- Student: Create -->
+            <div id="student-feedback-form" class="card hidden">
+                <h3>VENT / RANT</h3>
+                <input type="text" id="fb-title" placeholder="SUBJECT (E.G. FOOD SUCKS)">
+                <textarea id="fb-body" rows="3" placeholder="SCREAM INTO THE VOID..."></textarea>
+                <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; cursor: pointer;">
+                    <div class="custom-checkbox">
+                        <input type="checkbox" id="fb-anon" style="display: none;">
+                        <div class="checkbox-graphic"></div>
+                    </div>
+                    <span>POST ANONYMOUSLY</span>
+                </label>
+                <button onclick="submitFeedback()">SUBMIT RANT</button>
+            </div>
+
+            <!-- List -->
+            <div id="feedback-list">Loading...</div>
+        </div>
+
+        <!-- BLOGS TAB -->
+        <div id="tab-blogs" class="tab-content hidden">
+            <!-- Student: Create -->
+            <div id="student-blog-form" class="card hidden">
+                <h3>HOT TAKES</h3>
+                <input type="text" id="blog-title" placeholder="HEADLINE">
+                <textarea id="blog-body" rows="3" placeholder="SPIT FACTS..."></textarea>
+                <button onclick="submitBlog()">PUBLISH</button>
+            </div>
+
+            <!-- List -->
+            <div id="blog-list">Loading...</div>
+        </div>
+
+        <!-- ELECTIONS TAB -->
+        <div id="tab-elections" class="tab-content hidden">
+            <!-- Professor: Create -->
+            <div id="prof-election-form" class="card hidden">
+                <h3>START POWER STRUGGLE</h3>
+                <input type="text" id="el-title" placeholder="TITLE">
+                <input type="text" id="el-desc" placeholder="DESCRIPTION">
+                <textarea id="el-options" rows="3" placeholder="OPTIONS (COMMA SEPARATED)"></textarea>
+                <button onclick="createElection()">INITIATE</button>
+            </div>
+
+            <!-- List -->
+            <div id="election-list">Loading...</div>
+        </div>
+
+        <!-- SOS TAB -->
+        <div id="tab-sos" class="tab-content hidden">
+            <!-- Student: Trigger -->
+            <div id="student-sos-btn" class="card hidden" style="text-align: center; border: none; background: transparent; box-shadow: none;">
+                <button class="sos-btn" onclick="triggerSOS()">
+                    EMERGENCY!<br>SOS!
+                </button>
+                <p id="sos-status" style="margin-top: 2rem; font-weight: 900; font-size: 1.5rem; background: black; color: white; display: inline-block;"></p>
+            </div>
+
+            <!-- Professor: Log -->
+            <div id="prof-sos-log" class="hidden">
+                <h3>EMERGENCY LOG</h3>
+                <div id="sos-list">Loading...</div>
+            </div>
+        </div>
+
+        <!-- CHAT TAB -->
+        <div id="tab-chat" class="tab-content hidden">
+            <div class="card" style="height: 70vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+                <div style="background: var(--black); color: var(--white); padding: 1rem; border-bottom: 3px solid var(--black);">
+                    <h3 style="margin: 0; font-size: 1.5rem;">PRINCI KUTTAN AI</h3>
+                    <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">STRICTLY CONFIDENTIAL. MAYBE.</p>
+                </div>
+                
+                <div id="chat-history" style="flex: 1; padding: 1rem; overflow-y: auto; background: #f0f0f0; display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Messages go here -->
+                    <div class="chat-msg bot">
+                        <div class="msg-content">I AM PRINCI KUTTAN. STATE YOUR BUSINESS.</div>
+                    </div>
+                </div>
+
+                <div style="padding: 1rem; background: var(--white); border-top: 3px solid var(--black); display: flex; gap: 10px;">
+                    <input type="text" id="chat-input" placeholder="TYPE YOUR EMOTIONS HERE..." style="margin: 0; flex: 1;">
+                    <button onclick="sendChat()" style="padding: 0 2rem;">SEND</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- State & Config ---
+        const API_URL = 'http://localhost:3000/api';
+        let currentUser = { name: 'Alice Student', role: 'Student' };
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            handleRoleChange();
+            refreshAll();
+            
+            // Custom Checkbox Logic
+            const anonCheck = document.getElementById('fb-anon');
+            const graphic = document.querySelector('.checkbox-graphic');
+            if(anonCheck && graphic) {
+                anonCheck.addEventListener('change', (e) => {
+                    graphic.classList.toggle('checked', e.target.checked);
+                });
+            }
+        });
+
+        function refreshAll() {
+            loadFeedback();
+            loadBlogs();
+            loadElections();
+            loadSOS();
+        }
+
+        // --- Navigation ---
+        function switchTab(tabName) {
+            // Update Sidebar
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const activeNav = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
+            if(activeNav) activeNav.classList.add('active');
+
+            // Update Content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            
+            // Update Title
+            const titles = {
+                'dashboard': 'HUB',
+                'feedback': 'VENT / RANT',
+                'blogs': 'HOT TAKES',
+                'elections': 'POWER STRUGGLE',
+                'sos': 'PANIC BUTTON',
+                'chat': 'PRINCI KUTTAN'
+            };
+            document.getElementById('page-title').innerText = titles[tabName] || 'HUB';
+        }
+
+        // --- Role Management ---
+        function handleRoleChange() {
+            const roleSelect = document.getElementById('userRole');
+            const role = roleSelect.value;
+
+            if (role === 'Student') {
+                currentUser = { name: 'Alice Student', role: 'Student' };
+                document.getElementById('user-name-display').innerText = 'Alice Student';
+                document.getElementById('user-role-display').innerText = 'Student';
+                
+                // Visibility
+                document.getElementById('student-feedback-form').classList.remove('hidden');
+                document.getElementById('student-blog-form').classList.remove('hidden');
+                document.getElementById('student-sos-btn').classList.remove('hidden');
+                
+                document.getElementById('prof-election-form').classList.add('hidden');
+                document.getElementById('prof-sos-log').classList.add('hidden');
+            } else {
+                currentUser = { name: 'Dr. Bob Professor', role: 'Professor' };
+                document.getElementById('user-name-display').innerText = 'Dr. Bob';
+                document.getElementById('user-role-display').innerText = 'Professor';
+
+                // Visibility
+                document.getElementById('student-feedback-form').classList.add('hidden');
+                document.getElementById('student-blog-form').classList.add('hidden');
+                document.getElementById('student-sos-btn').classList.add('hidden');
+                
+                document.getElementById('prof-election-form').classList.remove('hidden');
+                document.getElementById('prof-sos-log').classList.remove('hidden');
+            }
+            refreshAll();
+        }
+
+        // --- API Actions ---
+
+        // 1. Feedback
+        async function submitFeedback() {
+            const title = document.getElementById('fb-title').value;
+            const body = document.getElementById('fb-body').value;
+            const isAnonymous = document.getElementById('fb-anon').checked;
+            if (!title || !body) return alert('FILL IT OUT.');
+
+            await fetch(`${API_URL}/feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, body, isAnonymous, authorName: currentUser.name })
+            });
+            alert('RANT SUBMITTED.');
+            loadFeedback();
+        }
+
+        async function loadFeedback() {
+            const res = await fetch(`${API_URL}/feedback`);
+            const data = await res.json();
+            document.getElementById('feedback-list').innerHTML = data.map(item => `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 10px;">
+                        <h4>${item.title}</h4>
+                        <span class="badge">${item.author}</span>
+                    </div>
+                    <p>${item.body}</p>
+                    <div class="text-muted" style="font-size: 0.8rem; margin-top: 10px;">${new Date(item.date).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        }
+
+        // 2. Blogs
+        async function submitBlog() {
+            const title = document.getElementById('blog-title').value;
+            const body = document.getElementById('blog-body').value;
+            if (!title || !body) return alert('FILL IT OUT.');
+
+            await fetch(`${API_URL}/blog`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, body, authorName: currentUser.name })
+            });
+            alert('PUBLISHED.');
+            loadBlogs();
+        }
+
+        async function loadBlogs() {
+            const res = await fetch(`${API_URL}/blog`);
+            const data = await res.json();
+            document.getElementById('blog-list').innerHTML = data.map(item => `
+                <div class="card">
+                    <h3>${item.title}</h3>
+                    <p class="text-muted" style="background: black; color: white; display: inline-block; padding: 2px;">By ${item.author}</p>
+                    <p>${item.body}</p>
+                </div>
+            `).join('');
+        }
+
+        // 3. Elections
+        async function createElection() {
+            const title = document.getElementById('el-title').value;
+            const description = document.getElementById('el-desc').value;
+            const optionsStr = document.getElementById('el-options').value;
+            
+            if (!title || !optionsStr) return alert('NEED TITLE AND OPTIONS');
+            
+            const options = optionsStr.split(',').map(s => s.trim()).filter(s => s);
+
+            await fetch(`${API_URL}/elections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, options })
+            });
+            alert('STARTED.');
+            loadElections();
+        }
+
+        async function loadElections() {
+            const res = await fetch(`${API_URL}/elections`);
+            const data = await res.json();
+            const container = document.getElementById('election-list');
+            
+            container.innerHTML = data.map(el => {
+                const totalVotes = el.options.reduce((sum, opt) => sum + opt.votes, 0);
+                
+                const optionsHtml = el.options.map(opt => {
+                    const percent = totalVotes === 0 ? 0 : Math.round((opt.votes / totalVotes) * 100);
+                    return `
+                        <div class="election-option" onclick="vote('${el.id}', '${opt.id}')">
+                            <div style="flex:1;">
+                                <strong>${opt.text}</strong>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${percent}%"></div>
+                                </div>
+                            </div>
+                            <div style="margin-left: 15px; font-weight: bold;">${opt.votes} (${percent}%)</div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3>${el.title}</h3>
+                            <span class="badge" style="background: var(--red); color: white;">ACTIVE</span>
+                        </div>
+                        <p>${el.description}</p>
+                        <div style="margin-top: 1rem;">${optionsHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function vote(electionId, optionId) {
+            if (currentUser.role !== 'Student') return alert('STUDENTS ONLY.');
+            
+            await fetch(`${API_URL}/elections/vote`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ electionId, optionId })
+            });
+            alert('VOTED.');
+            loadElections();
+        }
+
+        // 4. SOS
+        async function triggerSOS() {
+            if(!confirm("TRIGGER SOS? THIS IS REAL.")) return;
+            
+            await fetch(`${API_URL}/sos`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ authorName: currentUser.name, location: 'Campus Center' })
+            });
+            document.getElementById('sos-status').innerText = "ALERT SENT!";
+        }
+
+        async function loadSOS() {
+            const res = await fetch(`${API_URL}/sos`);
+            const data = await res.json();
+            document.getElementById('sos-list').innerHTML = data.map(item => `
+                <div class="card" style="border: 5px solid var(--red);">
+                    <h4 style="color: var(--red); font-size: 1.5rem;">SOS ALERT</h4>
+                    <p><strong>${item.author}</strong> at ${item.location}</p>
+                    <p class="text-muted">${new Date(item.timestamp).toLocaleString()}</p>
+                </div>
+            `).join('');
+        }
+
+        // 5. Chat
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value;
+            if(!msg) return;
+
+            // Add User Message
+            addMessage(msg, 'user');
+            input.value = '';
+
+            // Fetch Bot Response
+            const res = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            });
+            const data = await res.json();
+            
+            // Add Bot Message
+            addMessage(data.response, 'bot');
+        }
+
+        function addMessage(text, sender) {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.className = `chat-msg ${sender}`;
+            div.innerHTML = `<div class="msg-content">${text}</div>`;
+            history.appendChild(div);
+            history.scrollTop = history.scrollHeight;
+        }
+
+    </script>
+</body>
+</html>
