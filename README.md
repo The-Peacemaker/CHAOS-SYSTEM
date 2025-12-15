@@ -18,28 +18,43 @@ A Brutalist, high-energy College Community & Governance System designed to disru
 
 - **Frontend:** Vanilla HTML, CSS (Brutalist Design), JavaScript
 - **Backend:** Node.js, Express.js
+- **Database:** MongoDB (Mongoose)
 - **AI:** OpenRouter API (Gemini 2.0 Flash)
-- **Data:** In-memory mock database
+- **Auth:** JWT Authentication
 
 ## 🚀 Setup & Run
 
-1.  **Clone the Repository:**
+1.  **Prerequisites:**
+    - Node.js installed
+    - MongoDB installed and running locally (`mongodb://127.0.0.1:27017/voiceofcampus`)
+
+2.  **Clone the Repository:**
     ```bash
     git clone <your-repo-url>
     cd HACKATHON
     ```
 
-2.  **Install Dependencies:**
+3.  **Install Dependencies:**
     ```bash
     npm install
     ```
 
-3.  **Start the Server:**
+4.  **Start the Server:**
     ```bash
     node server.js
     ```
     Visit `http://localhost:3000` to enter the system.
 
+## 🔑 Test Credentials
+
+**Student:**
+- Email: `alice@example.com`
+- Password: `password123`
+
+**Professor (Admin):**
+- Email: `bob@example.com`
+- Password: `password123`
+
 ## ⚠️ Disclaimer
 
-This is a hackathon project. Data is stored in memory and will reset when the server restarts.
+This is a hackathon project. Ensure MongoDB is running before starting the server.

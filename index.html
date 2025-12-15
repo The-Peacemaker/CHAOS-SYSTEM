@@ -1,5 +1,4 @@
-<!-- File: index.html -->
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,6 +9,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <div class="logo" style="font-size: 2rem; margin-bottom: 1rem;">VOICE OF CAMPUS</div>
+            
+            <!-- Login Form -->
+            <div id="login-form">
+                <h2>LOGIN</h2>
+                <input type="email" id="login-email" placeholder="EMAIL (e.g. alice@example.com)">
+                <input type="password" id="login-pass" placeholder="PASSWORD">
+                <button onclick="login()">ENTER CHAOS</button>
+                <div class="login-toggle" onclick="toggleAuthMode()">New here? Register</div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="hidden">
+                <h2>JOIN US</h2>
+                <input type="text" id="reg-name" placeholder="FULL NAME">
+                <input type="email" id="reg-email" placeholder="EMAIL">
+                <input type="password" id="reg-pass" placeholder="PASSWORD">
+                <select id="reg-role">
+                    <option value="student">STUDENT</option>
+                    <option value="professor">PROFESSOR</option>
+                </select>
+                <button onclick="register()">REGISTER</button>
+                <div class="login-toggle" onclick="toggleAuthMode()">Already have an account? Login</div>
+            </div>
+            <p id="auth-error" style="color: var(--accent-4); font-weight: bold; margin-top: 1rem;"></p>
+        </div>
+    </div>
 
     <!-- Sidebar -->
     <nav class="sidebar">
@@ -37,14 +67,11 @@
         <div class="user-profile">
             <div style="font-size: 0.8rem; margin-bottom: 5px;">IDENTITY:</div>
             <div style="display: flex; flex-direction: column; gap: 5px;">
-                <strong id="user-name-display" style="background: var(--black); color: var(--white); padding: 2px 5px;">Alice Student</strong>
-                <span class="role-badge" id="user-role-display">Student</span>
-                <span class="karma-badge" id="user-karma-display">KARMA: 0</span>
+                <strong id="user-name-display" style="background: var(--black); color: var(--white); padding: 2px 5px;">...</strong>
+                <span class="role-badge" id="user-role-display">...</span>
+                <span class="karma-badge" id="user-karma-display">KARMA: ...</span>
             </div>
-            <select id="userRole" onchange="handleRoleChange()" style="margin-top: 15px;">
-                <option value="Student">VIEW: STUDENT</option>
-                <option value="Professor">VIEW: PROFESSOR</option>
-            </select>
+            <button class="secondary" onclick="logout()" style="margin-top: 1rem; width: 100%;">LOGOUT</button>
         </div>
     </nav>
 
@@ -192,13 +219,25 @@
     <script>
         // --- State & Config ---
         const API_URL = 'http://localhost:3000/api';
-        let currentUser = { name: 'Alice Student', role: 'Student', karma: 0 };
+        let currentUser = null;
+        let authToken = localStorage.getItem('token');
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            handleRoleChange();
-            refreshAll();
-            
+            if (authToken) {
+                // Try to restore session (simplified: just use stored user data if available, or re-login)
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    currentUser = JSON.parse(storedUser);
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    updateUIForUser();
+                    refreshAll();
+                } else {
+                    // Token exists but no user data? Logout to be safe
+                    logout();
+                }
+            }
+
             // Custom Checkbox Logic
             const anonCheck = document.getElementById('post-anon');
             const graphic = document.querySelector('.checkbox-graphic');
@@ -209,31 +248,114 @@
             }
         });
 
+        // --- Auth Functions ---
+        function toggleAuthMode() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('register-form').classList.toggle('hidden');
+            document.getElementById('auth-error').innerText = '';
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-pass').value;
+            const errorEl = document.getElementById('auth-error');
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.message);
+
+                authToken = data.token;
+                currentUser = data.user;
+                
+                localStorage.setItem('token', authToken);
+                localStorage.setItem('user', JSON.stringify(currentUser));
+
+                document.getElementById('login-overlay').classList.add('hidden');
+                updateUIForUser();
+                refreshAll();
+
+            } catch (err) {
+                errorEl.innerText = err.message;
+            }
+        }
+
+        async function register() {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-pass').value;
+            const role = document.getElementById('reg-role').value;
+            const errorEl = document.getElementById('auth-error');
+
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password, role })
+                });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.message);
+
+                // Auto login or ask to login? Let's ask to login
+                alert('Registration successful! Please login.');
+                toggleAuthMode();
+
+            } catch (err) {
+                errorEl.innerText = err.message;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            authToken = null;
+            currentUser = null;
+            location.reload();
+        }
+
+        function getHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            };
+        }
+
+        function updateUIForUser() {
+            document.getElementById('user-name-display').innerText = currentUser.name;
+            document.getElementById('user-role-display').innerText = currentUser.role.toUpperCase();
+            document.getElementById('user-karma-display').innerText = `KARMA: ${currentUser.karma}`;
+
+            if (currentUser.role === 'professor') {
+                document.getElementById('prof-election-form').classList.remove('hidden');
+                document.getElementById('student-sos-btn').classList.add('hidden');
+                document.getElementById('prof-sos-log').classList.remove('hidden');
+            } else {
+                document.getElementById('prof-election-form').classList.add('hidden');
+                document.getElementById('student-sos-btn').classList.remove('hidden');
+                document.getElementById('prof-sos-log').classList.add('hidden');
+            }
+        }
+
         function refreshAll() {
+            if (!authToken) return;
             loadPosts();
             loadElections();
             loadLeaderboard();
             loadSOS();
-            updateUserDisplay();
-        }
-
-        function updateUserDisplay() {
-            document.getElementById('user-name-display').innerText = currentUser.name;
-            document.getElementById('user-role-display').innerText = currentUser.role;
-            document.getElementById('user-karma-display').innerText = `KARMA: ${currentUser.karma}`;
         }
 
         // --- Navigation ---
         function switchTab(tabName) {
-            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            // Show target tab
             document.getElementById(`tab-${tabName}`).classList.remove('hidden');
             
-            // Update Sidebar
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            
-            // Find the nav item that calls this function
             const activeNav = document.querySelector(`.nav-item[onclick="switchTab('${tabName}')"]`);
             if(activeNav) activeNav.classList.add('active');
 
@@ -247,31 +369,12 @@
             document.getElementById('page-title').innerText = titles[tabName] || 'HUB';
         }
 
-        function handleRoleChange() {
-            const roleSelect = document.getElementById('userRole');
-            const role = roleSelect.value;
-            
-            if(role === 'Student') {
-                currentUser = { name: 'Alice Student', role: 'Student', karma: 120 };
-                document.getElementById('prof-election-form').classList.add('hidden');
-                document.getElementById('student-sos-btn').classList.remove('hidden');
-                document.getElementById('prof-sos-log').classList.add('hidden');
-            } else {
-                currentUser = { name: 'Dr. Bob Professor', role: 'Professor', karma: 50 };
-                document.getElementById('prof-election-form').classList.remove('hidden');
-                document.getElementById('student-sos-btn').classList.add('hidden');
-                document.getElementById('prof-sos-log').classList.remove('hidden');
-            }
-            updateUserDisplay();
-            refreshAll();
-        }
-
         // --- THE WALL (Posts) ---
         async function loadPosts() {
             const list = document.getElementById('wall-list');
             list.innerHTML = '<p>Loading...</p>';
             try {
-                const res = await fetch(`${API_URL}/posts`);
+                const res = await fetch(`${API_URL}/posts`, { headers: getHeaders() });
                 const posts = await res.json();
                 
                 if(posts.length === 0) {
@@ -289,8 +392,8 @@
                         <h4>${post.title}</h4>
                         <p>${post.body}</p>
                         <div class="post-actions">
-                            <button class="vote-btn up" onclick="votePost(${post.id}, 'up')">▲ ${post.upvotes}</button>
-                            <button class="vote-btn down" onclick="votePost(${post.id}, 'down')">▼ ${post.downvotes}</button>
+                            <button class="vote-btn up" onclick="votePost('${post._id}', 'up')">▲ ${post.upvotes}</button>
+                            <button class="vote-btn down" onclick="votePost('${post._id}', 'down')">▼ ${post.downvotes}</button>
                         </div>
                     </div>
                 `).join('');
@@ -309,29 +412,28 @@
 
             await fetch(`${API_URL}/posts`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({
-                    title, body, type, isAnonymous: isAnon, authorName: currentUser.name
+                    title, body, type, isAnonymous: isAnon
                 })
             });
 
             document.getElementById('post-title').value = '';
             document.getElementById('post-body').value = '';
             loadPosts();
-            // Optimistic Karma Update
-            if(!isAnon) currentUser.karma += 10;
-            updateUserDisplay();
+            // Refresh user to get new karma
+            // In a real app we'd fetch user profile again, but let's just increment locally for now or ignore
         }
 
         async function votePost(id, type) {
             const res = await fetch(`${API_URL}/posts/${id}/vote`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, userName: currentUser.name })
+                headers: getHeaders(),
+                body: JSON.stringify({ type })
             });
             if (!res.ok) {
                 const data = await res.json();
-                alert(data.error || 'Vote failed');
+                alert(data.message || 'Vote failed');
             }
             loadPosts();
         }
@@ -340,23 +442,21 @@
         async function loadElections() {
             const list = document.getElementById('election-list');
             try {
-                const res = await fetch(`${API_URL}/elections`);
+                const res = await fetch(`${API_URL}/elections`, { headers: getHeaders() });
                 const elections = await res.json();
                 
                 list.innerHTML = elections.map(el => `
                     <div class="card">
                         <div class="post-header">
                             <span class="post-type">${el.type ? el.type.toUpperCase() : 'POLL'}</span>
-                            <span class="post-status">${el.status}</span>
-                            ${currentUser.role === 'Professor' ? 
-                                `<button class="secondary" onclick="deleteElection(${el.id})" style="padding: 2px 5px; font-size: 0.8rem; border-color: var(--red); color: var(--red);">DELETE</button>` 
-                                : ''}
+                            <span class="post-status">${el.status || ''}</span>
+                            ${currentUser.role === 'professor' ? `<button class="secondary" style="color: var(--red); border-color: var(--red); padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="deleteElection('${el._id}')">DELETE</button>` : ''}
                         </div>
                         <h4>${el.title}</h4>
                         <p>${el.description}</p>
                         <div class="options-grid">
                             ${el.options.map(opt => `
-                                <button class="option-btn" onclick="voteElection(${el.id}, '${opt.id}')">
+                                <button class="option-btn" onclick="voteElection('${el._id}', '${opt.id}')">
                                     ${opt.text} <span class="vote-count">(${opt.votes})</span>
                                 </button>
                             `).join('')}
@@ -366,15 +466,6 @@
             } catch (e) {
                 list.innerHTML = '<p>Error loading elections.</p>';
             }
-        }
-
-        async function deleteElection(id) {
-            if(!confirm('Are you sure you want to delete this election?')) return;
-            
-            await fetch(`${API_URL}/elections/${id}`, {
-                method: 'DELETE'
-            });
-            loadElections();
         }
 
         async function createElection() {
@@ -387,7 +478,7 @@
 
             await fetch(`${API_URL}/elections`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({ title, description: desc, options, type })
             });
 
@@ -400,25 +491,37 @@
         async function voteElection(electionId, optionId) {
             const res = await fetch(`${API_URL}/elections/vote`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ electionId, optionId, userName: currentUser.name })
+                headers: getHeaders(),
+                body: JSON.stringify({ electionId, optionId })
             });
             if (!res.ok) {
                 const data = await res.json();
-                alert(data.error || 'Vote failed');
+                alert(data.message || 'Vote failed');
             }
             loadElections();
+        }
+
+        async function deleteElection(id) {
+            if(!confirm('Are you sure you want to delete this election?')) return;
+            
+            const res = await fetch(`${API_URL}/elections/${id}`, {
+                method: 'DELETE',
+                headers: getHeaders()
+            });
+            
+            if(res.ok) {
+                loadElections();
+            } else {
+                alert('Failed to delete election');
+            }
         }
 
         // --- LEADERBOARD ---
         async function loadLeaderboard() {
             const list = document.getElementById('leaderboard-list');
             try {
-                const res = await fetch(`${API_URL}/leaderboard`);
+                const res = await fetch(`${API_URL}/leaderboard`, { headers: getHeaders() });
                 let users = await res.json();
-                
-                // Take top 10
-                users = users.slice(0, 10);
                 
                 if (users.length === 0) {
                     list.innerHTML = '<p>No data available.</p>';
@@ -428,48 +531,13 @@
                 const top3 = users.slice(0, 3);
                 const rest = users.slice(3);
 
-                // Find max karma for scaling
-                const maxKarma = Math.max(...top3.map(u => u.karma || 0), 1);
-
                 let html = '';
 
-                // Podium Section (New Brutalist Style)
+                // Podium Section
                 html += '<div class="leaderboard-podium">';
-                
-                // Rank 2 (Left)
-                if (users[1]) {
-                    html += `
-                        <div class="podium-card rank-2">
-                            <div class="podium-rank">#2</div>
-                            <div class="podium-name">${users[1].name}</div>
-                            <div class="podium-score">${users[1].karma || 0} PTS</div>
-                        </div>
-                    `;
-                }
-
-                // Rank 1 (Center)
-                if (users[0]) {
-                    html += `
-                        <div class="podium-card rank-1">
-                            <div class="podium-rank">#1</div>
-                            <div class="podium-name">${users[0].name}</div>
-                            <div class="podium-score">${users[0].karma || 0} PTS</div>
-                            <div style="font-size: 3rem; margin-top: 10px;">👑</div>
-                        </div>
-                    `;
-                }
-
-                // Rank 3 (Right)
-                if (users[2]) {
-                    html += `
-                        <div class="podium-card rank-3">
-                            <div class="podium-rank">#3</div>
-                            <div class="podium-name">${users[2].name}</div>
-                            <div class="podium-score">${users[2].karma || 0} PTS</div>
-                        </div>
-                    `;
-                }
-                
+                if (users[1]) html += `<div class="podium-card rank-2"><div class="podium-rank">#2</div><div class="podium-name">${users[1].name}</div><div class="podium-score">${users[1].karma || 0} PTS</div></div>`;
+                if (users[0]) html += `<div class="podium-card rank-1"><div class="podium-rank">#1</div><div class="podium-name">${users[0].name}</div><div class="podium-score">${users[0].karma || 0} PTS</div><div style="font-size: 3rem; margin-top: 10px;">👑</div></div>`;
+                if (users[2]) html += `<div class="podium-card rank-3"><div class="podium-rank">#3</div><div class="podium-name">${users[2].name}</div><div class="podium-score">${users[2].karma || 0} PTS</div></div>`;
                 html += '</div>';
 
                 // List Section
@@ -485,17 +553,16 @@
                 
                 list.innerHTML = html;
             } catch (e) {
-                console.error(e);
                 list.innerHTML = '<p>Error loading leaderboard.</p>';
             }
         }
 
         // --- SOS ---
         async function loadSOS() {
-            if(currentUser.role !== 'Professor') return;
+            if(currentUser.role !== 'professor') return;
             const list = document.getElementById('sos-list');
             try {
-                const res = await fetch(`${API_URL}/sos`);
+                const res = await fetch(`${API_URL}/sos`, { headers: getHeaders() });
                 const alerts = await res.json();
                 list.innerHTML = alerts.map(a => `
                     <div class="card" style="border-color: var(--red);">
@@ -523,8 +590,8 @@
             
             await fetch(`${API_URL}/sos`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ authorName: currentUser.name, location })
+                headers: getHeaders(),
+                body: JSON.stringify({ location })
             });
 
             status.innerText = 'HELP IS ON THE WAY!';
@@ -546,47 +613,29 @@
             const text = input.value;
             if(!text) return;
 
-            // Add User Message
             const history = document.getElementById('chat-history');
-            history.innerHTML += `
-                <div class="chat-msg user">
-                    <div class="msg-content">${text}</div>
-                </div>
-            `;
+            history.innerHTML += `<div class="chat-msg user"><div class="msg-content">${text}</div></div>`;
             input.value = '';
             history.scrollTop = history.scrollHeight;
 
-            // Add Loading Indicator
             const loadingId = 'loading-' + Date.now();
-            history.innerHTML += `
-                <div class="chat-msg bot" id="${loadingId}">
-                    <div class="msg-content loading-dots">...</div>
-                </div>
-            `;
+            history.innerHTML += `<div class="chat-msg bot" id="${loadingId}"><div class="msg-content loading-dots">...</div></div>`;
             history.scrollTop = history.scrollHeight;
 
-            // Fetch Response
             try {
                 const res = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json' }, // Chat doesn't strictly need auth but good to have
                     body: JSON.stringify({ message: text })
                 });
                 const data = await res.json();
                 
-                // Remove Loading Indicator
                 const loadingEl = document.getElementById(loadingId);
                 if (loadingEl) loadingEl.remove();
 
-                history.innerHTML += `
-                    <div class="chat-msg bot">
-                        <div class="msg-content">${data.response}</div>
-                    </div>
-                `;
+                history.innerHTML += `<div class="chat-msg bot"><div class="msg-content">${data.response}</div></div>`;
                 history.scrollTop = history.scrollHeight;
             } catch (e) {
-                console.error(e);
-                // Remove Loading Indicator on error too
                 const loadingEl = document.getElementById(loadingId);
                 if (loadingEl) loadingEl.remove();
             }
