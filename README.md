@@ -77,7 +77,7 @@ Visit `http://localhost:3000` in your browser to enter the system.
 - **Email:** `alicestudent@example.com`
 - **Password:** `password123`
 
-**Professor (Admin) Account:**
+**Professor Account:**
 - **Email:** `drbobprofessor@example.com`
 - **Password:** `password123`
 
