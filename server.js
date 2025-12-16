@@ -1,187 +1,50 @@
 ﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const admin = require('firebase-admin');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Models
-const User = require('./models/User');
-const Post = require('./models/Post');
-const Election = require('./models/Election');
-const SOS = require('./models/SOS');
+// Initialize Firebase Admin
+// EXPECTS serviceAccountKey.json in the root directory
+try {
+    const serviceAccount = require('./serviceAccountKey.json');
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('🔥 Connected to Firebase Firestore');
+} catch (error) {
+    console.error('❌ Firebase Initialization Error: Missing serviceAccountKey.json or invalid credentials.');
+    console.error('Please download your service account key from Firebase Console > Project Settings > Service Accounts and save it as "serviceAccountKey.json" in the root folder.');
+    // We don't exit here to allow the server to start and show the error, 
+    // but DB operations will fail.
+}
+
+const db = admin.apps.length ? admin.firestore() : null;
+
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash",
+    systemInstruction: "You are EMO BOY, a campus chatbot who is humorous, slightly dramatic, but deeply emotionally supportive. You use slang, emojis, and sometimes act a bit 'emo' (emotional/moody) but always with the goal of helping the student. You are a safe space for students to vent. Keep responses concise and engaging."
+});
 
 const app = express();
 const PORT = 3000;
 const JWT_SECRET = 'chaos_is_a_ladder_hackathon_secret'; // In prod, use .env
-const MONGO_URI = 'mongodb://127.0.0.1:27017/voiceofcampus';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
-// --- MongoDB Connection & Seeding ---
-mongoose.connect(MONGO_URI)
-    .then(() => {
-        console.log('✅ Connected to MongoDB (Voice of Campus)');
-        seedDatabase();
-    })
-    .catch(err => console.error('❌ MongoDB Connection Error:', err));
-
-async function seedDatabase() {
-    try {
-        const userCount = await User.countDocuments();
-        if (userCount === 0) {
-            console.log('🌱 Seeding Database with Rich Data...');
-            const hashedPassword = await bcrypt.hash('password123', 10);
-
-            // 1. Create Users (from data.js)
-            const usersData = [
-                { name: 'Alice Student', email: 'alice@example.com', role: 'student', karma: 120 },
-                { name: 'Dr. Bob Professor', email: 'bob@example.com', role: 'professor', karma: 50 },
-                { name: 'Charlie Rebel', email: 'charlie@example.com', role: 'student', karma: 85 },
-                { name: 'Dana Scholar', email: 'dana@example.com', role: 'student', karma: 200 },
-                { name: 'Heidi Hacker', email: 'heidi@example.com', role: 'student', karma: 210 },
-                { name: 'Grace Coder', email: 'grace@example.com', role: 'student', karma: 180 },
-                { name: 'Eve Artist', email: 'eve@example.com', role: 'student', karma: 150 },
-                { name: 'Liam Music', email: 'liam@example.com', role: 'student', karma: 140 },
-                { name: 'Judy Law', email: 'judy@example.com', role: 'student', karma: 130 },
-                { name: 'Ivan Gamer', email: 'ivan@example.com', role: 'student', karma: 110 },
-                { name: 'Frank Jock', email: 'frank@example.com', role: 'student', karma: 95 },
-                { name: 'Kevin Cook', email: 'kevin@example.com', role: 'student', karma: 70 }
-            ];
-
-            const createdUsers = [];
-            for (const u of usersData) {
-                const user = await User.create({ ...u, password: hashedPassword });
-                createdUsers.push(user);
-            }
-            console.log('✅ Users Created');
-
-            // 2. Create Posts
-            const postsData = [
-                { 
-                    title: 'Cafeteria Food', 
-                    body: 'The food is cold and expensive. We need better options!', 
-                    author: 'Anonymous', 
-                    isAnonymous: true,
-                    upvotes: 15,
-                    downvotes: 2,
-                    type: 'complaint'
-                },
-                { 
-                    title: 'Library Hours', 
-                    body: 'Can we keep the library open until midnight during exam week?', 
-                    author: 'Dana Scholar', 
-                    authorId: createdUsers.find(u => u.name === 'Dana Scholar')._id,
-                    upvotes: 45,
-                    downvotes: 0,
-                    type: 'suggestion'
-                },
-                { 
-                    title: 'Campus Wi-Fi', 
-                    body: 'The Wi-Fi in the Science Block is non-existent. Please fix it!', 
-                    author: 'Charlie Rebel', 
-                    authorId: createdUsers.find(u => u.name === 'Charlie Rebel')._id,
-                    upvotes: 32,
-                    downvotes: 1,
-                    type: 'complaint'
-                },
-                { 
-                    title: 'Annual Tech Fest', 
-                    body: 'We should invite industry leaders for the upcoming Tech Fest.', 
-                    author: 'Alice Student', 
-                    authorId: createdUsers.find(u => u.name === 'Alice Student')._id,
-                    upvotes: 28,
-                    downvotes: 0,
-                    type: 'suggestion'
-                },
-                { 
-                    title: 'Parking Space', 
-                    body: 'Students are parking in faculty spots. It is chaos!', 
-                    author: 'Dr. Bob Professor', 
-                    authorId: createdUsers.find(u => u.name === 'Dr. Bob Professor')._id,
-                    upvotes: 10,
-                    downvotes: 5,
-                    type: 'rant'
-                }
-            ];
-            await Post.insertMany(postsData);
-            console.log('✅ Posts Created');
-
-            // 3. Create Elections
-            const electionsData = [
-                {
-                    title: 'Sports Coordinator Election',
-                    description: 'Vote for the Sports Coordinator.',
-                    options: [
-                        { id: 'opt1', text: 'Alex Striker', votes: 15 },
-                        { id: 'opt2', text: 'Jordan Dunk', votes: 12 }
-                    ],
-                    type: 'election'
-                },
-                {
-                    title: 'Arts Coordinator Election',
-                    description: 'Vote for the Arts Coordinator.',
-                    options: [
-                        { id: 'opt1', text: 'Leonardo Paint', votes: 20 },
-                        { id: 'opt2', text: 'Vincent Sketch', votes: 18 }
-                    ],
-                    type: 'election'
-                },
-                {
-                    title: 'Canteen Menu Change',
-                    description: 'Should we replace Taco Tuesday with Pizza Friday?',
-                    options: [
-                        { id: 'opt1', text: 'Yes, Pizza!', votes: 20 },
-                        { id: 'opt2', text: 'No, Tacos 4 Life', votes: 12 }
-                    ],
-                    type: 'poll'
-                },
-                {
-                    title: 'Campus Chairman Election',
-                    description: 'Who should lead the Student Union?',
-                    options: [
-                        { id: 'opt1', text: 'Michael Scott', votes: 45 },
-                        { id: 'opt2', text: 'Dwight Schrute', votes: 40 },
-                        { id: 'opt3', text: 'Jim Halpert', votes: 60 }
-                    ],
-                    type: 'election'
-                },
-                {
-                    title: 'Vice Chairman Election',
-                    description: 'Select your Vice Chairman.',
-                    options: [
-                        { id: 'opt1', text: 'Pam Beesly', votes: 55 },
-                        { id: 'opt2', text: 'Angela Martin', votes: 30 }
-                    ],
-                    type: 'election'
-                },
-                {
-                    title: 'General Secretary Election',
-                    description: 'Vote for the General Secretary.',
-                    options: [
-                        { id: 'opt1', text: 'Oscar Martinez', votes: 50 },
-                        { id: 'opt2', text: 'Kevin Malone', votes: 48 }
-                    ],
-                    type: 'election'
-                }
-            ];
-            await Election.insertMany(electionsData);
-            console.log('✅ Elections Created');
-
-            // 4. SOS Logs
-            await SOS.create([
-                { author: 'Charlie Rebel', location: 'Chemistry Lab (Fire?)', timestamp: new Date(Date.now() - 10000000) },
-                { author: 'Alice Student', location: 'Elevator stuck, Building B', timestamp: new Date(Date.now() - 5000000) }
-            ]);
-            console.log('✅ SOS Logs Created');
-        }
-    } catch (err) {
-        console.error('Seed Error:', err);
-    }
-}
+// Helper to map Firestore doc to object with _id
+const mapDoc = (doc) => {
+    if (!doc.exists) return null;
+    const data = doc.data();
+    return { _id: doc.id, ...data };
+};
 
 // --- Auth Middleware ---
 const authenticateToken = (req, res, next) => {
@@ -201,17 +64,22 @@ const authenticateToken = (req, res, next) => {
 
 // 0. Auth Routes
 app.post('/api/login', async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email });
+        const usersRef = db.collection('users');
+        const snapshot = await usersRef.where('email', '==', email).limit(1).get();
         
-        if (!user) return res.status(400).json({ message: 'User not found' });
+        if (snapshot.empty) return res.status(400).json({ message: 'User not found' });
+
+        const userDoc = snapshot.docs[0];
+        const user = userDoc.data();
 
         const validPass = await bcrypt.compare(password, user.password);
         if (!validPass) return res.status(400).json({ message: 'Invalid password' });
 
         // Create Token
-        const token = jwt.sign({ id: user._id, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: userDoc.id, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
         
         res.json({ 
             token, 
@@ -223,23 +91,27 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/register', async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     const { name, email, password, role } = req.body;
     
     try {
         // Check if user exists
-        const existing = await User.findOne({ email });
-        if (existing) return res.status(400).json({ message: 'Email already exists' });
+        const usersRef = db.collection('users');
+        const snapshot = await usersRef.where('email', '==', email).get();
+        
+        if (!snapshot.empty) return res.status(400).json({ message: 'Email already exists' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        const newUser = new User({
+        const newUser = {
             name,
             email,
             password: hashedPassword,
-            role: role || 'student'
-        });
+            role: role || 'student',
+            karma: 0
+        };
 
-        await newUser.save();
+        await usersRef.add(newUser);
         res.status(201).json({ message: 'User registered successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -248,8 +120,11 @@ app.post('/api/register', async (req, res) => {
 
 // 1. Posts Routes (The Wall)
 app.get('/api/posts', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     try {
-        const posts = await Post.find().sort({ date: -1 });
+        const postsRef = db.collection('posts');
+        const snapshot = await postsRef.orderBy('date', 'desc').get();
+        const posts = snapshot.docs.map(mapDoc);
         res.json(posts);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -257,57 +132,76 @@ app.get('/api/posts', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/posts', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     const { title, body, isAnonymous, type } = req.body;
     
-    const newPost = new Post({
+    const newPost = {
         title,
         body,
         author: isAnonymous ? 'Anonymous' : req.user.name,
         authorId: req.user.id,
         isAnonymous,
-        type: type || 'general'
-    });
+        type: type || 'general',
+        upvotes: 0,
+        downvotes: 0,
+        votedBy: [],
+        date: new Date().toISOString()
+    };
 
     try {
-        await newPost.save();
+        const docRef = await db.collection('posts').add(newPost);
+        const savedPost = await docRef.get();
         
         // Award Karma
         if (!isAnonymous) {
-            await User.findByIdAndUpdate(req.user.id, { $inc: { karma: 10 } });
+            const userRef = db.collection('users').doc(req.user.id);
+            await userRef.update({ karma: admin.firestore.FieldValue.increment(10) });
         }
         
-        res.status(201).json({ message: 'Post submitted', data: newPost });
+        res.status(201).json({ message: 'Post submitted', data: mapDoc(savedPost) });
     } catch (err) {
         res.status(400).json({ message: err.message });
     }
 });
 
 app.post('/api/posts/:id/vote', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     const { id } = req.params;
     const { type } = req.body; // 'up' or 'down'
     const userName = req.user.name;
 
     try {
-        const post = await Post.findById(id);
-        if (!post) return res.status(404).json({ message: 'Post not found' });
+        const postRef = db.collection('posts').doc(id);
+        const postDoc = await postRef.get();
+        
+        if (!postDoc.exists) return res.status(404).json({ message: 'Post not found' });
 
-        if (post.votedBy.includes(userName)) {
+        const postData = postDoc.data();
+
+        if (postData.votedBy && postData.votedBy.includes(userName)) {
             return res.status(400).json({ message: 'You have already voted.' });
         }
 
+        const updates = {
+            votedBy: admin.firestore.FieldValue.arrayUnion(userName)
+        };
+
         if (type === 'up') {
-            post.upvotes++;
+            updates.upvotes = admin.firestore.FieldValue.increment(1);
             // Award karma to author if not anonymous
-            if (!post.isAnonymous && post.authorId) {
-                await User.findByIdAndUpdate(post.authorId, { $inc: { karma: 5 } });
+            if (!postData.isAnonymous && postData.authorId) {
+                const authorRef = db.collection('users').doc(postData.authorId);
+                await authorRef.update({ karma: admin.firestore.FieldValue.increment(5) });
             }
         } else {
-            post.downvotes++;
+            updates.downvotes = admin.firestore.FieldValue.increment(1);
         }
 
-        post.votedBy.push(userName);
-        await post.save();
-        res.json({ message: 'Voted', data: post });
+        await postRef.update(updates);
+        
+        // Return updated doc
+        const updatedDoc = await postRef.get();
+        res.json({ message: 'Voted', data: mapDoc(updatedDoc) });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -315,8 +209,15 @@ app.post('/api/posts/:id/vote', authenticateToken, async (req, res) => {
 
 // 2. Leaderboard
 app.get('/api/leaderboard', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     try {
-        const users = await User.find().sort({ karma: -1 }).limit(10).select('-password');
+        const usersRef = db.collection('users');
+        const snapshot = await usersRef.orderBy('karma', 'desc').limit(10).get();
+        const users = snapshot.docs.map(doc => {
+            const data = doc.data();
+            delete data.password;
+            return { _id: doc.id, ...data };
+        });
         res.json(users);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -325,8 +226,11 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
 
 // 3. SOS Routes
 app.get('/api/sos', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     try {
-        const alerts = await SOS.find().sort({ timestamp: -1 });
+        const sosRef = db.collection('sos');
+        const snapshot = await sosRef.orderBy('timestamp', 'desc').get();
+        const alerts = snapshot.docs.map(mapDoc);
         res.json(alerts);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -334,17 +238,20 @@ app.get('/api/sos', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/sos', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     const { location } = req.body;
     
-    const newAlert = new SOS({
+    const newAlert = {
         author: req.user.name,
-        location: location || 'Unknown Location'
-    });
+        location: location || 'Unknown Location',
+        timestamp: new Date().toISOString()
+    };
 
     try {
-        await newAlert.save();
+        const docRef = await db.collection('sos').add(newAlert);
+        const savedAlert = await docRef.get();
         console.log(`[SOS ALERT] Triggered by ${req.user.name}`);
-        res.status(201).json({ message: 'SOS Alert Triggered!', data: newAlert });
+        res.status(201).json({ message: 'SOS Alert Triggered!', data: mapDoc(savedAlert) });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -352,8 +259,11 @@ app.post('/api/sos', authenticateToken, async (req, res) => {
 
 // 4. Elections
 app.get('/api/elections', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     try {
-        const elections = await Election.find();
+        const electionsRef = db.collection('elections');
+        const snapshot = await electionsRef.get();
+        const elections = snapshot.docs.map(mapDoc);
         res.json(elections);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -361,6 +271,7 @@ app.get('/api/elections', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/elections', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     // Only professors can create elections
     if (req.user.role !== 'professor') {
         return res.status(403).json({ message: 'Only professors can create elections.' });
@@ -374,91 +285,84 @@ app.post('/api/elections', authenticateToken, async (req, res) => {
         votes: 0
     }));
 
-    const newElection = new Election({
+    const newElection = {
         title,
         description,
         options: optionsArray,
-        type: type || 'poll'
-    });
+        type: type || 'poll',
+        status: 'active',
+        votedBy: []
+    };
 
     try {
-        await newElection.save();
-        res.status(201).json({ message: 'Poll created', data: newElection });
+        const docRef = await db.collection('elections').add(newElection);
+        const savedElection = await docRef.get();
+        res.status(201).json({ message: 'Poll created', data: mapDoc(savedElection) });
     } catch (err) {
         res.status(400).json({ message: err.message });
     }
 });
 
 app.post('/api/elections/vote', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     const { electionId, optionId } = req.body;
     const userName = req.user.name;
 
     try {
-        const election = await Election.findById(electionId);
-        if (!election) return res.status(404).json({ message: 'Election not found' });
+        const electionRef = db.collection('elections').doc(electionId);
+        const electionDoc = await electionRef.get();
+        
+        if (!electionDoc.exists) return res.status(404).json({ message: 'Election not found' });
 
-        if (election.votedBy.includes(userName)) {
+        const electionData = electionDoc.data();
+
+        if (electionData.votedBy && electionData.votedBy.includes(userName)) {
             return res.status(400).json({ message: 'You have already voted.' });
         }
 
-        const option = election.options.find(o => o.id === optionId);
-        if (!option) return res.status(404).json({ message: 'Option not found' });
+        const options = electionData.options;
+        const optionIndex = options.findIndex(o => o.id === optionId);
+        
+        if (optionIndex === -1) return res.status(404).json({ message: 'Option not found' });
 
-        option.votes++;
-        election.votedBy.push(userName);
-        await election.save();
-        res.json({ message: 'Vote recorded', data: election });
+        // Increment votes for the option
+        options[optionIndex].votes++;
+
+        await electionRef.update({
+            options: options,
+            votedBy: admin.firestore.FieldValue.arrayUnion(userName)
+        });
+
+        const updatedDoc = await electionRef.get();
+        res.json({ message: 'Vote recorded', data: mapDoc(updatedDoc) });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 app.delete('/api/elections/:id', authenticateToken, async (req, res) => {
+    if (!db) return res.status(500).json({ message: 'Database not connected' });
     if (req.user.role !== 'professor') {
         return res.status(403).json({ message: 'Only professors can delete elections.' });
     }
 
     try {
-        const election = await Election.findByIdAndDelete(req.params.id);
-        if (!election) return res.status(404).json({ message: 'Election not found' });
+        await db.collection('elections').doc(req.params.id).delete();
         res.json({ message: 'Election deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// 5. Chatbot (OpenRouter)
+// 5. Chatbot (Gemini)
 app.post('/api/chat', async (req, res) => {
     const { message } = req.body;
     
     try {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:3000",
-                "X-Title": "Voice of Campus"
-            },
-            body: JSON.stringify({
-                "model": "meta-llama/llama-3.2-3b-instruct:free",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are EMO BOY, a campus chatbot who is humorous, slightly dramatic, but deeply emotionally supportive. You use slang, emojis, and sometimes act a bit 'emo' (emotional/moody) but always with the goal of helping the student. You are a safe space for students to vent. Keep responses concise and engaging."
-                    },
-                    {
-                        "role": "user",
-                        "content": message
-                    }
-                ]
-            })
-        });
-
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
+        const result = await model.generateContent(message);
+        const response = await result.response;
+        const botReply = response.text();
         
-        const botReply = data.choices?.[0]?.message?.content || "I'm feeling a bit disconnected right now... 💔";
         res.json({ response: botReply });
 
     } catch (error) {

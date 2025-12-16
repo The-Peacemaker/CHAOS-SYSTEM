@@ -1,85 +1,143 @@
-const mongoose = require('mongoose');
+const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
-const User = require('./models/User');
-const Post = require('./models/Post');
-const Election = require('./models/Election');
-const SOS = require('./models/SOS');
 const { users, posts, elections, sosAlerts } = require('./data');
 
-const MONGO_URI = 'mongodb://127.0.0.1:27017/voiceofcampus';
+// Initialize Firebase Admin
+try {
+    const serviceAccount = require('./serviceAccountKey.json');
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('🔥 Connected to Firebase Firestore');
+} catch (error) {
+    console.error('❌ Firebase Initialization Error: Missing serviceAccountKey.json or invalid credentials.');
+    process.exit(1);
+}
 
-mongoose.connect(MONGO_URI)
-    .then(async () => {
+const db = admin.firestore();
+
+async function deleteCollection(collectionPath, batchSize) {
+    const collectionRef = db.collection(collectionPath);
+    const query = collectionRef.orderBy('__name__').limit(batchSize);
+
+    return new Promise((resolve, reject) => {
+        deleteQueryBatch(db, query, resolve).catch(reject);
+    });
+}
+
+async function deleteQueryBatch(db, query, resolve) {
+    const snapshot = await query.get();
+
+    const batchSize = snapshot.size;
+    if (batchSize === 0) {
+        resolve();
+        return;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    process.nextTick(() => {
+        deleteQueryBatch(db, query, resolve);
+    });
+}
+
+async function seed() {
+    try {
         console.log('🗑️  Clearing Database...');
-        await User.deleteMany({});
-        await Post.deleteMany({});
-        await Election.deleteMany({});
-        await SOS.deleteMany({});
+        await deleteCollection('users', 100);
+        await deleteCollection('posts', 100);
+        await deleteCollection('elections', 100);
+        await deleteCollection('sos', 100);
         console.log('✨ Database Cleared');
 
         console.log('🌱 Seeding Database from data.js...');
-        
+
         // 1. Create Users
         const hashedPassword = await bcrypt.hash('password123', 10);
-        const createdUsers = [];
+        const createdUsers = []; // Store { name: ..., id: ... }
+
+        const userBatch = db.batch();
         
         for (const u of users) {
-            // Generate a fake email if not present
             const email = u.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() + '@example.com';
-            // Map role to lowercase to match enum ['student', 'professor']
             const role = u.role.toLowerCase();
             
-            const user = await User.create({
+            const userRef = db.collection('users').doc(); // Auto-ID
+            const userData = {
                 name: u.name,
                 email: email,
                 password: hashedPassword,
                 role: role,
                 karma: u.karma
-            });
-            createdUsers.push(user);
+            };
+            
+            userBatch.set(userRef, userData);
+            createdUsers.push({ ...userData, id: userRef.id });
         }
+        await userBatch.commit();
         console.log(`✅ ${createdUsers.length} Users Created`);
 
         // 2. Create Posts
-        const postsData = posts.map(p => {
+        const postBatch = db.batch();
+        for (const p of posts) {
             const authorUser = createdUsers.find(u => u.name === p.author);
-            return {
+            const postRef = db.collection('posts').doc();
+            const postData = {
                 title: p.title,
                 body: p.body,
                 author: p.author,
-                authorId: authorUser ? authorUser._id : null,
+                authorId: authorUser ? authorUser.id : null,
                 isAnonymous: p.author === 'Anonymous',
                 type: p.type,
                 upvotes: p.upvotes,
                 downvotes: p.downvotes,
+                votedBy: [],
                 date: p.date
             };
-        });
-        await Post.insertMany(postsData);
-        console.log(`✅ ${postsData.length} Posts Created`);
+            postBatch.set(postRef, postData);
+        }
+        await postBatch.commit();
+        console.log(`✅ ${posts.length} Posts Created`);
 
         // 3. Create Elections
-        // Ensure options structure matches schema
-        const electionsData = elections.map(e => ({
-            title: e.title,
-            description: e.description,
-            options: e.options,
-            status: e.status,
-            type: e.type
-        }));
-        await Election.insertMany(electionsData);
-        console.log(`✅ ${electionsData.length} Elections Created`);
+        const electionBatch = db.batch();
+        for (const e of elections) {
+            const electionRef = db.collection('elections').doc();
+            const electionData = {
+                title: e.title,
+                description: e.description,
+                options: e.options,
+                status: e.status,
+                type: e.type,
+                votedBy: []
+            };
+            electionBatch.set(electionRef, electionData);
+        }
+        await electionBatch.commit();
+        console.log(`✅ ${elections.length} Elections Created`);
 
-        // 4. Create SOS (if any)
+        // 4. Create SOS
         if (sosAlerts && sosAlerts.length > 0) {
-            await SOS.insertMany(sosAlerts);
+            const sosBatch = db.batch();
+            for (const s of sosAlerts) {
+                const sosRef = db.collection('sos').doc();
+                sosBatch.set(sosRef, s);
+            }
+            await sosBatch.commit();
             console.log(`✅ ${sosAlerts.length} SOS Alerts Created`);
         }
 
         console.log('✨ Database Seeded Successfully');
         process.exit(0);
-    })
-    .catch(err => {
-        console.error(err);
+
+    } catch (error) {
+        console.error('Error seeding database:', error);
         process.exit(1);
-    });
+    }
+}
+
+seed();
