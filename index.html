@@ -218,7 +218,9 @@
 
     <script>
         // --- State & Config ---
-        const API_URL = '/api';
+        // IMPORTANT: When hosting on Netlify, change this URL to your Vercel Backend URL
+        // Example: const API_URL = 'https://your-project-name.vercel.app/api';
+        const API_URL = 'https://voiceofcampus.vercel.app/api'; 
         let currentUser = null;
         let authToken = localStorage.getItem('token');
 

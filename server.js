@@ -6,25 +6,38 @@ const bcrypt = require('bcryptjs');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin
-// EXPECTS serviceAccountKey.json in the root directory
+// EXPECTS serviceAccountKey.json in the root directory OR FIREBASE_SERVICE_ACCOUNT env var
+let serviceAccount;
 try {
-    const serviceAccount = require('./serviceAccountKey.json');
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('🔥 Connected to Firebase Firestore');
-} catch (error) {
-    console.error('❌ Firebase Initialization Error: Missing serviceAccountKey.json or invalid credentials.');
-    console.error('Please download your service account key from Firebase Console > Project Settings > Service Accounts and save it as "serviceAccountKey.json" in the root folder.');
-    // We don't exit here to allow the server to start and show the error, 
-    // but DB operations will fail.
+    serviceAccount = require('./serviceAccountKey.json');
+} catch (e) {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        try {
+            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        } catch (parseError) {
+            console.error('❌ Error parsing FIREBASE_SERVICE_ACCOUNT env var');
+        }
+    }
+}
+
+if (serviceAccount) {
+    try {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        console.log('🔥 Connected to Firebase Firestore');
+    } catch (error) {
+        console.error('❌ Firebase Initialization Error:', error.message);
+    }
+} else {
+    console.error('❌ Firebase Initialization Error: Missing serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT env var.');
 }
 
 const db = admin.apps.length ? admin.firestore() : null;
 
 const app = express();
-const PORT = 3000;
-const JWT_SECRET = 'chaos_is_a_ladder_hackathon_secret'; // In prod, use .env
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'chaos_is_a_ladder_hackathon_secret';
 
 // Middleware
 app.use(cors());
@@ -402,6 +415,12 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`VOICE OF CAMPUS Server running on http://localhost:${PORT}`);
-});
+// Export app for Vercel
+module.exports = app;
+
+// Only listen if run directly
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`VOICE OF CAMPUS Server running on http://localhost:${PORT}`);
+    });
+}
