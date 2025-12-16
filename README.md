@@ -74,11 +74,11 @@ Visit `http://localhost:3000` in your browser to enter the system.
 ## 🔑 Test Credentials
 
 **Student Account:**
-- **Email:** `alice@example.com`
+- **Email:** `alicestudent@example.com`
 - **Password:** `password123`
 
 **Professor (Admin) Account:**
-- **Email:** `bob@example.com`
+- **Email:** `drbobprofessor@example.com`
 - **Password:** `password123`
 
 ## ⚠️ Disclaimer
