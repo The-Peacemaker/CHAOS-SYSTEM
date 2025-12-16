@@ -4,7 +4,6 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const admin = require('firebase-admin');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Firebase Admin
 // EXPECTS serviceAccountKey.json in the root directory
@@ -22,13 +21,6 @@ try {
 }
 
 const db = admin.apps.length ? admin.firestore() : null;
-
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash",
-    systemInstruction: "You are EMO BOY, a campus chatbot who is humorous, slightly dramatic, but deeply emotionally supportive. You use slang, emojis, and sometimes act a bit 'emo' (emotional/moody) but always with the goal of helping the student. You are a safe space for students to vent. Keep responses concise and engaging."
-});
 
 const app = express();
 const PORT = 3000;
@@ -354,20 +346,59 @@ app.delete('/api/elections/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// 5. Chatbot (Gemini)
+// 5. Chatbot (OpenRouter with Fallback)
 app.post('/api/chat', async (req, res) => {
     const { message } = req.body;
     
+    // Fallback responses for when API is down (Hackathon Survival Mode)
+    const fallbackResponses = [
+        "Sigh... the digital void is loud today. But I hear you. 🖤",
+        "I'm feeling a bit disconnected from the mainframe... but your vibe is valid. 🥀",
+        "That's heavy. Like, My Chemical Romance heavy. 🎸",
+        "The wifi of my soul is lagging, but I'm sending you good energy. 💀",
+        "Just staring at the loading screen of life thinking about that. 🌑",
+        "I can't reach the cloud right now (it's too sunny), but I support you. ☁️",
+        "Error 404: Motivation not found... jk, I'm here. What else is up? 💔"
+    ];
+
     try {
-        const result = await model.generateContent(message);
-        const response = await result.response;
-        const botReply = response.text();
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:3000",
+                "X-Title": "Voice of Campus"
+            },
+            body: JSON.stringify({
+                "model": "nousresearch/hermes-3-llama-3.1-405b:free",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are EMO BOY, a campus chatbot who is humorous, slightly dramatic, but deeply emotionally supportive. You use slang, emojis, and sometimes act a bit 'emo' (emotional/moody) but always with the goal of helping the student. You are a safe space for students to vent. Keep responses concise and engaging."
+                    },
+                    {
+                        "role": "user",
+                        "content": message
+                    }
+                ]
+            })
+        });
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error.message);
         
+        const botReply = data.choices?.[0]?.message?.content;
+        if (!botReply) throw new Error("No content received");
+
         res.json({ response: botReply });
 
     } catch (error) {
-        console.error("AI Error:", error);
-        res.status(500).json({ response: "My emotional circuits are overloaded... (Server Error) 😭" });
+        console.error("AI Error (Switching to Fallback):", error.message);
+        
+        // Return a random fallback response instead of crashing
+        const randomFallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+        res.json({ response: randomFallback });
     }
 });
 
